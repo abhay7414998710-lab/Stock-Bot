@@ -10,7 +10,7 @@ def send_email_alert(report_text):
     
     msg = EmailMessage()
     msg.set_content(report_text)
-    msg.subject = "🚨 Complete NSE Stocks Report with Stop-Loss!"
+    msg.subject = "🚨 Active Smart Stock Signals & Stop-Loss Report!"
     msg['From'] = sender_email
     msg['To'] = sender_email
     
@@ -18,7 +18,7 @@ def send_email_alert(report_text):
         with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
             server.login(sender_email, app_password)
             server.send_message(msg)
-        print("Poori report email par bhej di gayi hai! 📧")
+        print("Filtered active report email par bhej di gayi hai! 📧")
     except Exception as e:
         print(f"Error: {e}")
 
@@ -36,34 +36,53 @@ symbols = [
     "TRENT.NS", "NESTLEIND.NS"
 ]
 
-report_summary = "Aaj ka Complete Stock Scan & Stop-Loss Report:\n\n"
+report_summary = "Aaj ke Active Filtered Stock Signals & Stop-Loss:\n\n"
+active_signals_found = False
+
 print("... Market scan ho raha hai...\n")
 
 for symbol in symbols:
     try:
-        stock_data = yf.download(symbol, period="70d", interval="1d", progress=False)
-        if stock_data.empty:
+        stock_data = yf.download(symbol, period="90d", interval="1d", progress=False)
+        if stock_data.empty or len(stock_data) < 60:
             continue
             
         close = stock_data['Close']
         latest_price = float(close.iloc[-1])
         ma_50 = float(close.rolling(window=50).mean().iloc[-1])
         
-        # Stop-loss calculation (2% buffer)
-        clean_name = symbol.replace(".NS", "")
-        if latest_price > ma_50:
-            stop_loss = latest_price * 0.98  # Buy ke liye 2% niche
-            signal = f"🟢 BUY : {clean_name} | Price: {latest_price:.2f} | 50MA: {ma_50:.2f} | SL: {stop_loss:.2f}\n"
+        # RSI Calculation (14 periods)
+        delta = close.diff()
+        gain = delta.clip(lower=0)
+        loss = -delta.clip(upper=0.0)
+        avg_gain = gain.rolling(window=14).mean().iloc[-1]
+        avg_loss = loss.rolling(window=14).mean().iloc[-1]
+        if avg_loss == 0:
+            rsi = 100
         else:
-            stop_loss = latest_price * 1.02  # Sell ke liye 2% upar
-            signal = f"🔴 SELL : {clean_name} | Price: {latest_price:.2f} | 50MA: {ma_50:.2f} | SL: {stop_loss:.2f}\n"
+            rs = avg_gain / avg_loss
+            rsi = 100 - (100 / (1 + rs))
             
-        print(signal)
-        report_summary += signal
+        clean_name = symbol.replace(".NS", "")
         
+        # Filter Logic: Sirf wahi stocks aayenge jinka RSI aur Moving Average strong active signal de raha ho
+        if latest_price > ma_50 and rsi > 55:
+            stop_loss = latest_price * 0.98
+            signal = f"🟢 BUY : {clean_name} | Price: {latest_price:.2f} | 50MA: {ma_50:.2f} | RSI: {rsi:.1f} | SL: {stop_loss:.2f}\n"
+            report_summary += signal
+            active_signals_found = True
+        elif latest_price < ma_50 and rsi < 45:
+            stop_loss = latest_price * 1.02
+            signal = f"🔴 SELL : {clean_name} | Price: {latest_price:.2f} | 50MA: {ma_50:.2f} | RSI: {rsi:.1f} | SL: {stop_loss:.2f}\n"
+            report_summary += signal
+            active_signals_found = True
+            
     except Exception as e:
-        print(f"⚠️ {symbol} skip ho gaya.")
+        continue
+
+if not active_signals_found:
+    report_summary += "Aaj koi bhi strong active signal match nahi hua hai.\n"
 
 report_summary += "\n---\nBot automated by Jyoti"
 send_email_alert(report_summary)
-print("Scan aur Stop-Loss email bhejne ka kaam poora ho gaya!")
+print("Filtered Active Report email par bhej di gayi hai!")
