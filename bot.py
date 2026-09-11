@@ -10,7 +10,7 @@ def send_email_alert(report_text):
     
     msg = EmailMessage()
     msg.set_content(report_text)
-    msg.subject = "🚨 Advanced Smart Stock Signals Report!"
+    msg.subject = "🚨 Complete NSE Stocks Report with Stop-Loss!"
     msg['From'] = sender_email
     msg['To'] = sender_email
     
@@ -18,7 +18,7 @@ def send_email_alert(report_text):
         with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
             server.login(sender_email, app_password)
             server.send_message(msg)
-        print("Advanced report email par bhej di gayi hai! 📧")
+        print("Poori report email par bhej di gayi hai! 📧")
     except Exception as e:
         print(f"Error: {e}")
 
@@ -36,56 +36,34 @@ symbols = [
     "TRENT.NS", "NESTLEIND.NS"
 ]
 
-report_summary = "Smart Filtered Stock Signals (50 MA + RSI + Volume Spike):\n\n"
-active_signals_count = 0
+report_summary = "Aaj ka Complete Stock Scan & Stop-Loss Report:\n\n"
+print("... Market scan ho raha hai...\n")
 
 for symbol in symbols:
     try:
-        stock_data = yf.download(symbol, period="90d", interval="1d", progress=False)
-        if stock_data.empty or len(stock_data) < 60:
+        stock_data = yf.download(symbol, period="70d", interval="1d", progress=False)
+        if stock_data.empty:
             continue
             
         close = stock_data['Close']
-        volume = stock_data['Volume']
-        
         latest_price = float(close.iloc[-1])
         ma_50 = float(close.rolling(window=50).mean().iloc[-1])
         
-        # RSI Calculation (14 periods)
-        delta = close.diff()
-        gain = delta.clip(lower=0)
-        loss = -delta.clip(upper=0.0)
-        avg_gain = gain.rolling(window=14).mean().iloc[-1]
-        avg_loss = loss.rolling(window=14).mean().iloc[-1]
-        if avg_loss == 0:
-            rsi = 100
-        else:
-            rs = avg_gain / avg_loss
-            rsi = 100 - (100 / (1 + rs))
-            
-        # Volume Spike Check (Latest volume > 1.5x of 20-day average volume)
-        avg_vol = volume.rolling(window=20).mean().iloc[-1]
-        latest_vol = volume.iloc[-1]
-        is_volume_spike = latest_vol > (1.5 * avg_vol)
-        
+        # Stop-loss calculation (2% buffer)
         clean_name = symbol.replace(".NS", "")
-        
-        # Filter Logic: Price above 50MA & RSI > 50 for Buy; Price below 50MA & RSI < 50 for Sell
-        if latest_price > ma_50 and rsi > 50:
-            signal = f"🟢 BUY : {clean_name} | Price: {latest_price:.2f} | RSI: {rsi:.1f} | Vol Spike: {'Yes 🔥' if is_volume_spike else 'Normal'}\n"
-            report_summary += signal
-            active_signals_count += 1
-        elif latest_price < ma_50 and rsi < 50:
-            signal = f"🔴 SELL : {clean_name} | Price: {latest_price:.2f} | RSI: {rsi:.1f} | Vol Spike: {'Yes 🔥' if is_volume_spike else 'Normal'}\n"
-            report_summary += signal
-            active_signals_count += 1
+        if latest_price > ma_50:
+            stop_loss = latest_price * 0.98  # Buy ke liye 2% niche
+            signal = f"🟢 BUY : {clean_name} | Price: {latest_price:.2f} | 50MA: {ma_50:.2f} | SL: {stop_loss:.2f}\n"
+        else:
+            stop_loss = latest_price * 1.02  # Sell ke liye 2% upar
+            signal = f"🔴 SELL : {clean_name} | Price: {latest_price:.2f} | 50MA: {ma_50:.2f} | SL: {stop_loss:.2f}\n"
             
+        print(signal)
+        report_summary += signal
+        
     except Exception as e:
-        continue
-
-if active_signals_count == 0:
-    report_summary += "Aaj koi strong active signal match nahi hua.\n"
+        print(f"⚠️ {symbol} skip ho gaya.")
 
 report_summary += "\n---\nBot automated by Jyoti"
 send_email_alert(report_summary)
-print("Advanced scan aur email bhejne ka kaam poora ho gaya!")
+print("Scan aur Stop-Loss email bhejne ka kaam poora ho gaya!")
