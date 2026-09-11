@@ -2,6 +2,7 @@ import os
 import smtplib
 from email.message import EmailMessage
 import yfinance as yf
+import pandas as pd
 
 def send_email_alert(report_text):
     sender_email = "abhay7414998710@gmail.com"
@@ -9,7 +10,7 @@ def send_email_alert(report_text):
     
     msg = EmailMessage()
     msg.set_content(report_text)
-    msg.subject = "🚨 Real-Time Top NSE Stocks Daily Report!"
+    msg.subject = "🚨 Advanced Smart Stock Signals Report!"
     msg['From'] = sender_email
     msg['To'] = sender_email
     
@@ -17,7 +18,7 @@ def send_email_alert(report_text):
         with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
             server.login(sender_email, app_password)
             server.send_message(msg)
-        print("Real-time report successfully email par bhej di gayi hai! 📧")
+        print("Advanced report email par bhej di gayi hai! 📧")
     except Exception as e:
         print(f"Error: {e}")
 
@@ -35,33 +36,56 @@ symbols = [
     "TRENT.NS", "NESTLEIND.NS"
 ]
 
-report_summary = "Aaj ka Real-Time Top Stocks Scan Result:\n\n"
-print("... Live market data fetch ho raha hai...\n")
+report_summary = "Smart Filtered Stock Signals (50 MA + RSI + Volume Spike):\n\n"
+active_signals_count = 0
 
 for symbol in symbols:
     try:
-        stock_data = yf.download(symbol, period="70d", interval="1d", progress=False)
-        if stock_data.empty:
+        stock_data = yf.download(symbol, period="90d", interval="1d", progress=False)
+        if stock_data.empty or len(stock_data) < 60:
             continue
             
-        close_prices = stock_data['Close']
-        if hasattr(close_prices, "iloc"):
-            latest_price = float(close_prices.iloc[-1])
-            ma_50 = float(close_prices.rolling(window=50).mean().iloc[-1])
+        close = stock_data['Close']
+        volume = stock_data['Volume']
+        
+        latest_price = float(close.iloc[-1])
+        ma_50 = float(close.rolling(window=50).mean().iloc[-1])
+        
+        # RSI Calculation (14 periods)
+        delta = close.diff()
+        gain = delta.clip(lower=0)
+        loss = -delta.clip(upper=0.0)
+        avg_gain = gain.rolling(window=14).mean().iloc[-1]
+        avg_loss = loss.rolling(window=14).mean().iloc[-1]
+        if avg_loss == 0:
+            rsi = 100
         else:
-            continue
+            rs = avg_gain / avg_loss
+            rsi = 100 - (100 / (1 + rs))
             
+        # Volume Spike Check (Latest volume > 1.5x of 20-day average volume)
+        avg_vol = volume.rolling(window=20).mean().iloc[-1]
+        latest_vol = volume.iloc[-1]
+        is_volume_spike = latest_vol > (1.5 * avg_vol)
+        
         clean_name = symbol.replace(".NS", "")
-        if latest_price > ma_50:
-            signal = f"🟢 BUY : {clean_name} | Price: {latest_price:.2f} | 50 MA: {ma_50:.2f}\n"
-        else:
-            signal = f"🔴 SELL : {clean_name} | Price: {latest_price:.2f} | 50 MA: {ma_50:.2f}\n"
+        
+        # Filter Logic: Price above 50MA & RSI > 50 for Buy; Price below 50MA & RSI < 50 for Sell
+        if latest_price > ma_50 and rsi > 50:
+            signal = f"🟢 BUY : {clean_name} | Price: {latest_price:.2f} | RSI: {rsi:.1f} | Vol Spike: {'Yes 🔥' if is_volume_spike else 'Normal'}\n"
+            report_summary += signal
+            active_signals_count += 1
+        elif latest_price < ma_50 and rsi < 50:
+            signal = f"🔴 SELL : {clean_name} | Price: {latest_price:.2f} | RSI: {rsi:.1f} | Vol Spike: {'Yes 🔥' if is_volume_spike else 'Normal'}\n"
+            report_summary += signal
+            active_signals_count += 1
             
-        print(signal)
-        report_summary += signal
     except Exception as e:
-        print(f"⚠️ {symbol} ka data fetch karne mein error aaya.")
+        continue
+
+if active_signals_count == 0:
+    report_summary += "Aaj koi strong active signal match nahi hua.\n"
 
 report_summary += "\n---\nBot automated by Jyoti"
 send_email_alert(report_summary)
-print("\nReal-time scan aur email ka kaam poora ho gaya! 📊📧")
+print("Advanced scan aur email bhejne ka kaam poora ho gaya!")
