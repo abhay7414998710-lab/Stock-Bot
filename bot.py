@@ -1,7 +1,9 @@
+import os
 import requests
 
-token = "8816713797:AAEMNKiCD1H0IPVIrpwzgNzgV_shPm7h9Pg"
-chat_id = "6150123285"
+token = os.environ.get("TELEGRAM_TOKEN")
+chat_id = os.environ.get("TELEGRAM_CHAT_ID")
+
 url = f"https://api.telegram.org/bot{token}/sendMessage"
 payload = {
     "chat_id": chat_id,
