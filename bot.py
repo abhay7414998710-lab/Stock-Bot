@@ -53,15 +53,16 @@ for symbol in symbols:
             continue
             
         close = stock_data['Close']
-        latest_price = float(close.iloc[-1])
-        ma_50 = float(close.rolling(window=50).mean().iloc[-1])
+        latest_price = float(close.iloc[-1].item())
+        ma_50 = float(close.rolling(window=50).mean().iloc[-1].item())
         
         # RSI Calculation (14 periods)
         delta = close.diff()
         gain = delta.clip(lower=0)
         loss = -delta.clip(upper=0.0)
-        avg_gain = gain.rolling(window=14).mean().iloc[-1]
-        avg_loss = loss.rolling(window=14).mean().iloc[-1]
+        avg_gain = float(gain.rolling(window=14).mean().iloc[-1].item())
+        avg_loss = float(loss.rolling(window=14).mean().iloc[-1].item())
+        
         if avg_loss == 0:
             rsi = 100
         else:
