@@ -1,24 +1,29 @@
 import os
-import smtplib
-from email.message import EmailMessage
+import requests
 import yfinance as yf
 import pandas as pd
 
-def send_email_alert(report_text):
-    sender_email = "abhay7414998710@gmail.com"
-    app_password = os.environ.get("MAIL_PASS")
+def send_telegram_alert(report_text):
+    token = os.environ.get("TELEGRAM_TOKEN")
+    chat_id = os.environ.get("TELEGRAM_CHAT_ID")
     
-    msg = EmailMessage()
-    msg.set_content(report_text)
-    msg.subject = "🚨 Active Smart Stock Signals & Stop-Loss Report!"
-    msg['From'] = sender_email
-    msg['To'] = sender_email
+    if not token or not chat_id:
+        print("Telegram credentials nahi mile!")
+        return
+        
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    payload = {
+        "chat_id": chat_id,
+        "text": report_text,
+        "parse_mode": "Markdown"
+    }
     
     try:
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
-            server.login(sender_email, app_password)
-            server.send_message(msg)
-        print("Filtered active report email par bhej di gayi hai! 📧")
+        response = requests.post(url, json=payload)
+        if response.status_code == 200:
+            print("Filtered active report Telegram par bhej di gayi hai! 🚀")
+        else:
+            print(f"Telegram Error: {response.text}")
     except Exception as e:
         print(f"Error: {e}")
 
@@ -36,7 +41,7 @@ symbols = [
     "TRENT.NS", "NESTLEIND.NS"
 ]
 
-report_summary = "Aaj ke Active Filtered Stock Signals & Stop-Loss:\n\n"
+report_summary = "🚨 *Aaj ke Active Filtered Stock Signals & Stop-Loss:*\n\n"
 active_signals_found = False
 
 print("... Market scan ho raha hai...\n")
@@ -65,15 +70,15 @@ for symbol in symbols:
             
         clean_name = symbol.replace(".NS", "")
         
-        # Filter Logic: Sirf wahi stocks aayenge jinka RSI aur Moving Average strong active signal de raha ho
+        # Filter Logic: Sirf active signals
         if latest_price > ma_50 and rsi > 55:
             stop_loss = latest_price * 0.98
-            signal = f"🟢 BUY : {clean_name} | Price: {latest_price:.2f} | 50MA: {ma_50:.2f} | RSI: {rsi:.1f} | SL: {stop_loss:.2f}\n"
+            signal = f"🟢 *BUY* : `{clean_name}` | Price: `{latest_price:.2f}` | 50MA: `{ma_50:.2f}` | RSI: `{rsi:.1f}` | SL: `{stop_loss:.2f}`\n"
             report_summary += signal
             active_signals_found = True
         elif latest_price < ma_50 and rsi < 45:
             stop_loss = latest_price * 1.02
-            signal = f"🔴 SELL : {clean_name} | Price: {latest_price:.2f} | 50MA: {ma_50:.2f} | RSI: {rsi:.1f} | SL: {stop_loss:.2f}\n"
+            signal = f"🔴 *SELL* : `{clean_name}` | Price: `{latest_price:.2f}` | 50MA: `{ma_50:.2f}` | RSI: `{rsi:.1f}` | SL: `{stop_loss:.2f}`\n"
             report_summary += signal
             active_signals_found = True
             
@@ -83,6 +88,6 @@ for symbol in symbols:
 if not active_signals_found:
     report_summary += "Aaj koi bhi strong active signal match nahi hua hai.\n"
 
-report_summary += "\n---\nBot automated by Jyoti"
-send_email_alert(report_summary)
-print("Filtered Active Report email par bhej di gayi hai!")
+report_summary += "\n---\nBot automated for Jyoti ✨"
+send_telegram_alert(report_summary)
+print("Filtered Active Report Telegram par bhej di gayi hai!")
